@@ -9,7 +9,7 @@
 #include <godot_cpp/classes/rd_pipeline_multisample_state.hpp>
 #include <godot_cpp/classes/rd_pipeline_rasterization_state.hpp>
 #include <godot_cpp/classes/rd_sampler_state.hpp>
-#include <godot_cpp/classes/rd_shader_file.hpp>
+#include <godot_cpp/classes/rd_shader_source.hpp>
 #include <godot_cpp/classes/rd_shader_spirv.hpp>
 #include <godot_cpp/classes/rd_uniform.hpp>
 #include <godot_cpp/classes/rd_vertex_attribute.hpp>
@@ -163,28 +163,28 @@ bool RdRenderer::Init()
     shader_source.instantiate();
     shader_source->set_language(RenderingDevice::SHADER_LANGUAGE_GLSL);
 
-    // Vertex shader source
-    shader_source->set_code_vertex(
-       "#version 450 core
+    // Vertex shader source using raw string literal
+    shader_source->set_stage_source(RenderingDevice::SHADER_STAGE_VERTEX, R"(
+        #version 450 core
         layout(location = 0) in vec2 aPos;
         layout(location = 1) in vec2 aUV;
         layout(location = 2) in vec4 aColor;
         layout(push_constant) uniform uPushConstant { vec2 uScale; vec2 uTranslate; } pc;
-        
+
         out gl_PerVertex { vec4 gl_Position; };
         layout(location = 0) out struct { vec4 Color; vec2 UV; } Out;
-        
+
         void main()
         {
             Out.Color = aColor;
             Out.UV = aUV;
             gl_Position = vec4(aPos * pc.uScale + pc.uTranslate, 0, 1);
-        }"
-    );
+        }
+    )");
 
-    // Fragment shader source
-    shader_source->set_code_fragment(
-       "#version 450 core
+    // Fragment shader source using raw string literal
+    shader_source->set_stage_source(RenderingDevice::SHADER_STAGE_FRAGMENT, R"(
+        #version 450 core
         layout(location = 0) out vec4 fColor;
         layout(set=0, binding=0) uniform sampler2D sTexture;
         layout(location = 0) in struct { vec4 Color; vec2 UV; } In;
@@ -192,8 +192,8 @@ bool RdRenderer::Init()
         void main()
         {
             fColor = In.Color * texture(sTexture, In.UV.st);
-        }"
-    );
+        }
+    )");
 
     // Compile shader to SPIR-V
     Ref<RDShaderSPIRV> spirv = RD->shader_compile_spirv_from_source(shader_source);
