@@ -151,10 +151,55 @@ bool RdRenderer::Init()
 
     // set up everything to match the official Vulkan backend as closely as possible
 
-    Ref<RDShaderFile> shaderFile =
-        ResourceLoader::get_singleton()->load("res://addons/imgui-godot/data/ImGuiShader.glsl");
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // HACK FIX BEGIN: Disabling loading the ImGuiShader.glsl because headless builds can import shaders when exporting
+    // OLD LINE: Ref<RDShaderFile> shaderFile = ResourceLoader::get_singleton()->load("res://addons/imgui-godot/data/ImGuiShader.glsl");
+    // OLD LINE: impl->shader = RD->shader_create_from_spirv(shaderFile->get_spirv());
+    // ALSO:   addons/imgui-godot/data/ImGuiShader.glsl has been deleted
+    // NEW LINES: Instead of the glsl file, this manually creates the shader using the exact programs from the asset
 
-    impl->shader = RD->shader_create_from_spirv(shaderFile->get_spirv());
+    // Set up shader source
+    Ref<RDShaderSource> shader_source;
+    shader_source.instantiate();
+    shader_source->set_language(RenderingDevice::SHADER_LANGUAGE_GLSL);
+
+    // Vertex shader source
+    shader_source->set_code_vertex(
+       "#version 450 core
+        layout(location = 0) in vec2 aPos;
+        layout(location = 1) in vec2 aUV;
+        layout(location = 2) in vec4 aColor;
+        layout(push_constant) uniform uPushConstant { vec2 uScale; vec2 uTranslate; } pc;
+        
+        out gl_PerVertex { vec4 gl_Position; };
+        layout(location = 0) out struct { vec4 Color; vec2 UV; } Out;
+        
+        void main()
+        {
+            Out.Color = aColor;
+            Out.UV = aUV;
+            gl_Position = vec4(aPos * pc.uScale + pc.uTranslate, 0, 1);
+        }"
+    );
+
+    // Fragment shader source
+    shader_source->set_code_fragment(
+       "#version 450 core
+        layout(location = 0) out vec4 fColor;
+        layout(set=0, binding=0) uniform sampler2D sTexture;
+        layout(location = 0) in struct { vec4 Color; vec2 UV; } In;
+
+        void main()
+        {
+            fColor = In.Color * texture(sTexture, In.UV.st);
+        }"
+    );
+
+    // Compile shader to SPIR-V
+    Ref<RDShaderSPIRV> spirv = RD->shader_compile_spirv_from_source(shader_source);
+    impl->shader = RD->shader_create_from_spirv(spirv);
+    // HACK FIX END
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     if (!impl->shader.is_valid())
         return false;
