@@ -95,7 +95,7 @@ internal class RdRenderer : IRenderer
         _shader = RD.ShaderCreateFromSpirV(RD.ShaderCompileSpirVFromSource(shaderSource));
         // HACK FIX END
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        
+
         if (!_shader.IsValid)
             throw new RdRendererException("failed to create shader");
 
